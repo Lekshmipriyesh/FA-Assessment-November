@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Math Detective Agency - Teacher Console</title>
+<style>
+:root{--ink:#0f2a43;--bg:#eef3f6;--card:#fff;--acc:#0e9aa7;--tag:#f3d98b;--ok:#17803f;--no:#c0392b;--mut:#5f6f7e;--ln:#d9e2e8}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 Georgia,serif;background:var(--bg);color:var(--ink)}
+h3{margin:0 0 8px;font-size:17px}
+header{background:var(--ink);color:#fff;padding:16px 18px}header h1{margin:0;font-size:21px}header small{color:#b9cad8}
+main{max-width:980px;margin:0 auto;padding:0 12px 40px}
+nav{display:flex;gap:6px;padding-top:12px}
+nav button{border:1px solid var(--ln);padding:8px 18px;border-radius:8px;background:#dfe8ee;font:600 14px system-ui;cursor:pointer;color:var(--ink)}
+nav .on{background:var(--ink);color:#fff}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:8px;padding:14px;margin:10px 0}
+.sel{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+label{font:12px system-ui;color:var(--mut);display:block;margin-bottom:3px}
+select,input,textarea{width:100%;padding:8px;border:1px solid var(--ln);border-radius:6px;font:14px system-ui;background:#fff;color:var(--ink)}
+.b{background:var(--acc);color:#fff;border:0;border-radius:6px;font:600 14px system-ui;padding:9px 16px;cursor:pointer;margin-top:8px}
+.b.g{background:#fff;color:var(--ink);border:1px solid var(--ink)}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.q{padding:9px 0;border-bottom:1px solid var(--ln)}
+.tag{font:12px system-ui;padding:1px 8px;border-radius:4px;background:var(--tag);margin-right:6px}.tag.i{background:#bfe3e7}
+.key{color:var(--ok);font:600 14px system-ui;display:none;margin-top:3px}.keys .key{display:block}
+table{border-collapse:collapse;width:100%;font:14px system-ui}td,th{padding:5px 6px;border-bottom:1px solid var(--ln);text-align:center}td:first-child,th:first-child{text-align:left}
+.m{width:36px;height:36px;border-radius:6px;border:1px solid var(--ln);background:#fff;font-size:18px;cursor:pointer;color:var(--mut)}
+.m.y{background:#dcf3e4;color:var(--ok);border-color:var(--ok)}.m.n{background:#fbe0dc;color:var(--no);border-color:var(--no)}
+.bar{height:8px;background:#e3eaef;border-radius:4px;overflow:hidden;margin:3px 0 8px}.bar i{display:block;height:100%;background:var(--acc)}
+.stats{display:flex;gap:28px;flex-wrap:wrap;margin-bottom:10px}.big{font-size:30px;font-weight:700}
+.hint{color:var(--mut);font:13px system-ui}.wrap{overflow-x:auto}
+</style></head><body>
+<header><h1>Math Detective Agency</h1><small>Velammal New Gen School, Navalur Campus. Teacher test console</small></header>
+<main>
+<nav><button id="b1" class="on" onclick="tab(0)">Run test</button><button id="b2" onclick="tab(1)">History</button></nav>
+<section id="t1">
+<div class="card"><div class="sel">
+<div><label for="s">Subject</label><select id="s"></select></div>
+<div><label for="d">Date</label><input type="date" id="d"></div>
+<div><label for="c">Class</label><select id="c"></select></div>
+<div><label for="sec">Section</label><select id="sec"></select></div>
+<div><label for="n">Session</label><select id="n"></select></div></div>
+<p><label style="display:inline"><input type="checkbox" id="ky" style="width:auto" checked onchange="render()"> Show answer key (untick to hide before reading questions to students)</label></p></div>
+<div class="card"><h3>Questions</h3><div id="qs"></div></div>
+<div class="card"><h3>Students</h3>
+<details><summary>Edit names</summary><textarea id="rn" rows="6" placeholder="One student name per line"></textarea><button class="b" onclick="sn()">Save names</button></details>
+<p class="hint">Tap a box to cycle: tick (correct), cross (wrong), blank (absent or not asked).</p>
+<div class="wrap" id="gr"></div></div>
+<div id="an"></div>
+</section>
+<section id="t2" hidden>
+<div class="card"><label for="hq">Search by student, class (6A), subject or date</label><input id="hq" oninput="hrender()">
+<button class="b g" onclick="csv()">Export CSV</button></div>
+<div id="hl"></div>
+</section>
+</main>
+<script src="questions.js"></script>
+<script src="roster.js"></script>
+<script>
+const $=id=>document.getElementById(id),LS=localStorage;
+const get=(k,d)=>{try{const v=JSON.parse(LS.getItem(k));return v==null?d:v}catch(e){return d}},set=(k,v)=>LS.setItem(k,JSON.stringify(v));
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fill=(id,o)=>$(id).innerHTML=o.map(x=>`<option>${x}</option>`).join('');
+let Qs=[],marks={},hist=get('hist',[]);
+const key=()=>[$('d').value,$('s').value,$('c').value,$('sec').value,$('n').value].join('|');
+const BK=typeof BANK=='undefined'?[]:BANK;
+const names=()=>{const k=$('c').value+$('sec').value,v=get('r:'+k,null);return(v!=null?String(v):(typeof ROSTER!='undefined'&&ROSTER[k]||[]).join('\n')).split('\n').map(x=>x.trim()).filter(Boolean)};
+const hit=m=>m.some(v=>v===0||v===1),ticks=m=>m.filter(v=>v===1).length;
+const pct=m=>hit(m)?Math.round(ticks(m)/Qs.length*100):null;
+function sessions(){const m=new Map();BK.filter(b=>b.s==$('s').value&&b.c==$('c').value).forEach(b=>b.q.forEach(q=>m.set(q[0],b.ch)));
+ return Array.from({length:Math.max(12,...m.keys())},(_,i)=>[i+1,m.get(i+1)])}
+function fillSess(){const l=sessions();$('n').innerHTML=l.map(([n,ch])=>`<option value="${n}">${n}. ${ch?esc(ch):'(no questions yet)'}</option>`).join('');const f=l.find(x=>x[1]);if(f)$('n').value=f[0];load()}
+function load(){Qs=[];BK.filter(b=>b.s==$('s').value&&b.c==$('c').value).forEach(b=>b.q.filter(q=>q[0]==$('n').value).forEach(q=>Qs.push({t:q[1],q:q[2],a:q[3]})));
+ const old=hist.find(h=>h.id==key());marks=old?JSON.parse(JSON.stringify(old.marks)):{};$('rn').value=names().join('\n');render()}
+function sn(){set('r:'+$('c').value+$('sec').value,$('rn').value);render()}
+function tg(r,i){const n=names()[r],m=marks[n]=marks[n]||[];m[i]=m[i]===1?0:m[i]===0?undefined:1;render()}
+function render(){const N=names();
+ $('qs').className=$('ky').checked?'keys':'';
+ $('qs').innerHTML=Qs.length?Qs.map((x,i)=>`<div class="q"><span class="tag ${x.t=='I'?'i':''}">${x.t=='I'?'Indirect':'Direct'}</span><b>Q${i+1}.</b> ${esc(x.q)}<div class="key">Answer: ${esc(x.a)}</div></div>`).join(''):'<p class="hint">No questions for this class and subject yet. Add them in questions.js.</p>';
+ $('an').innerHTML='';
+ if(!Qs.length||!N.length){$('gr').innerHTML=!Qs.length?`<p class="hint">${N.length} students loaded for ${$('c').value}${$('sec').value}. Questions for this session are not added yet.</p><p>${N.map(esc).join(', ')}</p>`:'<p class="hint">Add the names for this section under Edit names, then start marking.</p>';return}
+ let h='<table><tr><th>Student</th>'+Qs.map((_,i)=>`<th>Q${i+1}</th>`).join('')+'<th>Score</th><th>%</th></tr>';
+ N.forEach((n,r)=>{const m=marks[n]||[],p=pct(m);h+=`<tr><td>${esc(n)}</td>`+Qs.map((_,i)=>`<td><button class="m ${m[i]===1?'y':m[i]===0?'n':''}" onclick="tg(${r},${i})" aria-label="${esc(n)} Q${i+1}">${m[i]===1?'\u2713':m[i]===0?'\u2717':'\u00b7'}</button></td>`).join('')+`<td>${ticks(m)}/${Qs.length}</td><td>${p==null?'-':p+'%'}</td></tr>`});
+ $('gr').innerHTML=h+'</table>';analysis(N)}
+function analysis(N){const A=N.filter(n=>pct(marks[n]||[])!=null);if(!A.length)return;
+ const P=A.map(n=>pct(marks[n])),avg=Math.round(P.reduce((a,b)=>a+b)/A.length),reach=Math.round(P.filter(p=>p>=60).length/A.length*100);
+ const sup=A.filter((n,i)=>P[i]<50),pq=Qs.map((_,i)=>Math.round(A.filter(n=>marks[n][i]===1).length/A.length*100));
+ $('an').innerHTML=`<div class="card"><h3>Analysis</h3><div class="stats"><div><div class="big">${avg}%</div>Class average</div><div><div class="big">${reach}%</div>Learning reach (60% and above)</div><div><div class="big">${A.length}/${N.length}</div>Students assessed</div></div>`
+ +pq.map((p,i)=>`<div>Q${i+1}: <b>${p}%</b> answered correctly</div><div class="bar"><i style="width:${p}%"></i></div>`).join('')
+ +(sup.length?`<p><b>Support Class (below 50%):</b> ${sup.map(esc).join(', ')}</p>`:'<p>Everyone assessed scored 50% or more.</p>')
+ +`<p class="hint">Revisit first: Q${pq.indexOf(Math.min(...pq))+1}, the question with the lowest reach.</p><button class="b" onclick="save()">Save result to history</button></div>`}
+function save(){const id=key(),r={id,date:$('d').value,s:$('s').value,c:$('c').value,sec:$('sec').value,n:$('n').value,ch:(sessions().find(x=>x[0]==$('n').value)||[])[1],tot:Qs.length,marks:JSON.parse(JSON.stringify(marks))};
+ hist=hist.filter(h=>h.id!=id);hist.unshift(r);set('hist',hist);alert('Saved to history.')}
+function rs(h){const P=Object.entries(h.marks).filter(([n,m])=>hit(m)).map(([n,m])=>[n,Math.round(ticks(m)/h.tot*100)]);
+ return{P,avg:P.length?Math.round(P.reduce((a,b)=>a+b[1],0)/P.length):0,reach:P.length?Math.round(P.filter(x=>x[1]>=60).length/P.length*100):0}}
+function hrender(){const q=$('hq').value.toLowerCase();
+ const L=hist.filter(h=>!q||[h.s,h.c+h.sec,h.ch,h.date].join(' ').toLowerCase().includes(q)||Object.keys(h.marks).some(n=>n.toLowerCase().includes(q)));
+ $('hl').innerHTML=L.length?L.map(h=>{const r=rs(h),me=q?r.P.filter(x=>x[0].toLowerCase().includes(q)).map(x=>`${esc(x[0])}: <b>${x[1]}%</b>`).join(', '):'';
+ return `<div class="card"><b>${h.date}</b>, ${h.s}, Class ${h.c}${h.sec}, Session ${h.n} ${esc(h.ch||'')}<br>Class average <b>${r.avg}%</b>, learning reach <b>${r.reach}%</b>, ${r.P.length} students assessed${me?'<br>'+me:''}<details><summary>Student-wise</summary>${r.P.map(x=>`${esc(x[0])}: ${x[1]}%`).join('<br>')}</details><button class="b g" onclick="del(${hist.indexOf(h)})">Delete</button></div>`}).join(''):'<p class="hint">No saved results yet. Run a test and choose Save result to history.</p>'}
+function del(i){if(confirm('Delete this record?')){hist.splice(i,1);set('hist',hist);hrender()}}
+function csv(){let o='Date,Subject,Class,Section,Session,Student,Score,Total,Percent\n';hist.forEach(h=>rs(h).P.forEach(([n,p])=>o+=[h.date,h.s,h.c,h.sec,h.n,'"'+n+'"',Math.round(p*h.tot/100),h.tot,p].join(',')+'\n'));
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([o],{type:'text/csv'}));a.download='detective-history.csv';a.click()}
+function tab(t){$('t1').hidden=!!t;$('t2').hidden=!t;$('b1').className=t?'':'on';$('b2').className=t?'on':'';if(t)hrender()}
+fill('s',['Mathematics','Science','Social Science']);fill('c',[6,7,8]);fill('sec',['A','B']);
+$('d').value=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+['s','c'].forEach(i=>$(i).onchange=fillSess);['sec','d','n'].forEach(i=>$(i).onchange=load);
+$('c').value=6;fillSess();
+</script></body></html>
